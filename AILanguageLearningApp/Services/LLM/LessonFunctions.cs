@@ -17,7 +17,6 @@ namespace AILanguageLearningApp.Services.LLM
             [Description("The language level (e.g., A1, A2, B1).")] string level,
             [Description("The exercises payload raw JSON string. MUST match the requested schema layout exactly.")] string exercisesJson)
         {
-            Console.WriteLine("CreateLesson function call");
             if (!Enum.TryParse(level, true, out LanguageLevel languageLevel))
             {
                 throw new ArgumentException($"Level '{level}' is not a valid enumerated value.");
@@ -30,7 +29,6 @@ namespace AILanguageLearningApp.Services.LLM
                 CreatedAt = DateTimeOffset.UtcNow,
                 Id = Guid.CreateVersion7()
             };
-            Console.WriteLine($"Lesson created: {lesson.Language}, {lesson.Topic}, {lesson.Level}, {lesson.CreatedAt}, {lesson.Id}");
             try
             {
                 // Manually deserialize the flattened string
@@ -50,13 +48,13 @@ namespace AILanguageLearningApp.Services.LLM
 
         [KernelFunction]
         [Description("Adds structured exercises to an existing lesson using its unique ID.")]
-        public string AddLessonExercises(
-        [Description("The unique GUID string of the existing lesson.")] string lessonId,
-        [Description("The exercises payload raw JSON string. MUST match the requested schema layout exactly.")] string exercisesJson)
+        public List<LessonExercise> AddLessonExercises(
+            [Description("The unique GUID string of the existing lesson.")] string lessonId,
+            [Description("The exercises payload raw JSON string. MUST match the requested schema layout exactly.")] string exercisesJson)
         {
             if (!Guid.TryParse(lessonId, out Guid lessonGuid))
             {
-                return "Error: Invalid lessonId format. Must be a valid GUID.";
+                throw new ArgumentException("Invalid lessonId format. Must be a valid GUID.");
             }
 
             try
@@ -64,8 +62,7 @@ namespace AILanguageLearningApp.Services.LLM
                 List<LessonExercise>? exercises = JsonSerializer.Deserialize<List<LessonExercise>>(exercisesJson, _jsonOptions);
                 if (exercises != null)
                 {
-                    ProcessExercises(lessonGuid, exercises);
-                    return $"Successfully added {exercises.Count} exercises.";
+                    return ProcessExercises(lessonGuid, exercises);
                 }
             }
             catch (Exception ex)
@@ -73,25 +70,25 @@ namespace AILanguageLearningApp.Services.LLM
                 Console.WriteLine($"[JSON ERROR] Failed to parse exercisesJson string: {ex.Message}");
             }
 
-            return "Error: Failed to process exercises.";
+            return [];
         }
 
-        private void ProcessExercises(Guid lessonId, List<LessonExercise> exercises)
+        private List<LessonExercise> ProcessExercises(Guid lessonId, List<LessonExercise> exercises)
         {
             foreach (LessonExercise exercise in exercises)
             {
                 exercise.Id = Guid.CreateVersion7();
                 exercise.LessonId = lessonId;
-                Console.WriteLine($" -> Exercise Created: {exercise.Id}, Task Count: {exercise.Tasks?.Count ?? 0}");
 
                 if (exercise.Tasks == null) continue;
 
                 foreach (ExerciseTask task in exercise.Tasks)
                 {
                     task.ExerciseId = exercise.Id;
-                    Console.WriteLine(task.ToString());
                 }
             }
+
+            return exercises;
         }
     }
 }

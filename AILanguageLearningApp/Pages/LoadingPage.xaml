@@ -1,0 +1,38 @@
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="AILanguageLearningApp.Pages.LoadingPage"
+             BackgroundColor="{AppThemeBinding Light=#F7F7F7, Dark=#121212}">
+    <Grid>
+        <VerticalStackLayout
+            VerticalOptions="Center"
+            HorizontalOptions="Center"
+            Spacing="20">
+
+            <!-- App Logo -->
+            <Image Source="app_logo.png"
+                   WidthRequest="120"
+                   HeightRequest="120"
+                   Opacity="0.9"/>
+
+            <!-- Title -->
+            <Label Text="AI Language Learning App"
+                   FontSize="28"
+                   FontAttributes="Bold"
+                   TextColor="{AppThemeBinding Light=#333, Dark=#EEE}"
+                   HorizontalOptions="Center"/>
+
+            <!-- Subtitle -->
+            <Label Text="Preparing your workspace..."
+                   FontSize="16"
+                   TextColor="{AppThemeBinding Light=#666, Dark=#AAA}"
+                   HorizontalOptions="Center"/>
+
+            <!-- Spinner -->
+            <ActivityIndicator
+                IsRunning="True"
+                Color="{AppThemeBinding Light=#2E7D32, Dark=#81C784}"
+                WidthRequest="40"
+                HeightRequest="40"/>
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

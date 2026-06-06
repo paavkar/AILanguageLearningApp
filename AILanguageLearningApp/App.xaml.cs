@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using AILanguageLearningApp.Pages;
 
 namespace AILanguageLearningApp
 {
@@ -11,7 +11,27 @@ namespace AILanguageLearningApp
 
         protected override Window CreateWindow(IActivationState? activationState)
         {
-            return new Window(new AppShell());
+            Window window = new()
+            {
+                Page = new LoadingPage(),
+                Title = "AI Language Learning App"
+            };
+
+            _ = InitializeRootPage(window);
+
+            return window;
+        }
+
+        private async Task InitializeRootPage(Window window)
+        {
+            var userLanguage = await SecureStorage.GetAsync("userLanguage");
+
+            if (string.IsNullOrWhiteSpace(userLanguage))
+            {
+                await SecureStorage.SetAsync("userLanguage", "English");
+            }
+
+            window.Page = new AppShell();
         }
     }
 }

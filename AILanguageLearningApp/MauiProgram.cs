@@ -1,7 +1,7 @@
-﻿using AILanguageLearningApp.PageModels;
-using AILanguageLearningApp.Services.LLM;
+﻿using AILanguageLearningApp.Services.LLM;
 using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
+using Syncfusion.Maui.Toolkit.Hosting;
 
 namespace AILanguageLearningApp
 {
@@ -16,19 +16,24 @@ namespace AILanguageLearningApp
                 {
                     options.SetShouldEnableSnackbarOnWindows(true);
                 })
+                .ConfigureSyncfusionToolkit()
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+                    fonts.AddFont("FluentSystemIcons-Regular.ttf", FluentUI.FontFamily);
                 });
 #if DEBUG
             builder.Logging.AddDebug();
 #endif
+            builder.Services.AddSingleton<UserAccountRepository>();
             builder.Services.AddSingleton<ILlmService, LlmService>();
 
             builder.Services.AddTransient<MainPageModel>();
 
-            return builder.Build();
+            MauiApp app = builder.Build();
+
+            return app;
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using Microsoft.SemanticKernel;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.Ollama;
 using System.Text;
@@ -7,23 +8,24 @@ namespace AILanguageLearningApp.Services.LLM
 {
     public class LlmService : ILlmService
     {
-        IKernelBuilder builder = Kernel.CreateBuilder();
-        HttpClient ollamaClient = new()
+        readonly IKernelBuilder builder = Kernel.CreateBuilder();
+        readonly HttpClient ollamaClient = new()
         {
             BaseAddress = new Uri("http://localhost:11434"),
             Timeout = TimeSpan.FromMinutes(10) // Allow up to 10 minutes for massive nested JSON generations
         };
-        Kernel Kernel;
-        IChatCompletionService Chat;
-        ChatHistory History = new();
-        OllamaPromptExecutionSettings Settings = new()
+        readonly Kernel Kernel;
+        readonly IChatCompletionService Chat;
+        readonly ChatHistory History = [];
+        readonly OllamaPromptExecutionSettings Settings = new()
         {
             FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
         };
 
-        string userLanguage = "English";
+        string userLanguage = SecureStorage.GetAsync("userLanguage").GetAwaiter().GetResult() ?? "English";
+        ILogger<LlmService> Logger;
 
-        public LlmService()
+        public LlmService(ILogger<LlmService> logger)
         {
             builder.AddOllamaChatCompletion(
                 modelId: "gemma4:12b",
@@ -131,6 +133,7 @@ namespace AILanguageLearningApp.Services.LLM
                 Invoke the required function tool now with all arguments satisfied.
             """;
             History.AddSystemMessage(systemMessage);
+            Logger = logger;
         }
 
         public async Task CreateNewLessonAsync(string language, string exerciseTopic, string proficiencyLevel, int exerciseCount, int taskCount)
@@ -146,7 +149,6 @@ namespace AILanguageLearningApp.Services.LLM
             History.AddUserMessage(input);
             await GenerateResponseAsync();
         }
-
 
         public async Task CreateNewExercisesAsync(Guid lessonId, string language, string exerciseTopic, string proficiencyLevel, int exerciseCount, int taskCount)
         {
@@ -175,7 +177,6 @@ namespace AILanguageLearningApp.Services.LLM
                 {
                     if (!string.IsNullOrEmpty(token.Content))
                     {
-                        Console.Write(token.Content);
                         assistantMessage.Append(token.Content);
                     }
                 }
@@ -183,7 +184,7 @@ namespace AILanguageLearningApp.Services.LLM
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred: {ex.Message}");
+                Logger.LogError(ex, "An error occurred while generating the response from the LLM.");
             }
         }
     }
