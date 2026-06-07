@@ -74,6 +74,7 @@
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.8" />
 		<PackageReference Include="Microsoft.SemanticKernel" Version="1.77.0" />
 		<PackageReference Include="Microsoft.SemanticKernel.Connectors.Ollama" Version="1.77.0-alpha" />
+		<PackageReference Include="Microsoft.SemanticKernel.Connectors.Onnx" Version="1.77.0-alpha" />
 		<PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.11" />
 		<PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.10" />
 	</ItemGroup>

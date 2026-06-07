@@ -64,27 +64,57 @@ namespace AILanguageLearningApp.Services.LLM
             {
                 IKernelBuilder builder = Kernel.CreateBuilder();
 
-#pragma warning disable SKEXP0070
-                // Register the Heavy Model with a distinct Service ID
-                builder.AddOllamaChatCompletion(
-                    serviceId: "OllamaHeavy",
-                    modelId: _heavyModelId,
-                    httpClient: _ollamaClient
-                );
+                if (DeviceInfo.Current.Platform == DevicePlatform.Android ||
+                    DeviceInfo.Current.Platform == DevicePlatform.iOS)
+                {
+                    var baseModelPath = FileSystem.AppDataDirectory;
+                    var heavyModelFolderPath = Path.Combine(baseModelPath, _heavyModelId);
+                    var lightModelFolderPath = Path.Combine(baseModelPath, _lightModelId);
 
-                // Register the Light Model with a distinct Service ID
-                builder.AddOllamaChatCompletion(
-                    serviceId: "OllamaLight",
-                    modelId: _lightModelId,
-                    httpClient: _ollamaClient
-                );
+                    if (Directory.Exists(heavyModelFolderPath))
+                    {
+                        builder.AddOnnxRuntimeGenAIChatCompletion(
+                            modelId: _heavyModelId,
+                            serviceId: "OnnxHeavy",
+                            modelPath: heavyModelFolderPath
+                        );
+                    }
+
+                    if (Directory.Exists(lightModelFolderPath))
+                    {
+                        builder.AddOnnxRuntimeGenAIChatCompletion(
+                            modelId: _lightModelId,
+                            serviceId: "OnnxLight",
+                            modelPath: lightModelFolderPath
+                        );
+                    }
+
+                    Kernel internalKernel = builder.Build();
+
+                    _heavyChatService = internalKernel.GetRequiredService<IChatCompletionService>("OnnxHeavy");
+                    _lightChatService = internalKernel.GetRequiredService<IChatCompletionService>("OnnxLight");
+                }
+                else
+                {
+#pragma warning disable SKEXP0070
+                    builder.AddOllamaChatCompletion(
+                        serviceId: "OllamaHeavy",
+                        modelId: _heavyModelId,
+                        httpClient: _ollamaClient
+                    );
+
+                    builder.AddOllamaChatCompletion(
+                        serviceId: "OllamaLight",
+                        modelId: _lightModelId,
+                        httpClient: _ollamaClient
+                    );
 #pragma warning restore SKEXP0070
 
-                Kernel internalKernel = builder.Build();
+                    Kernel internalKernel = builder.Build();
 
-                // Extract the separate services using their Service IDs
-                _heavyChatService = internalKernel.GetRequiredService<IChatCompletionService>("OllamaHeavy");
-                _lightChatService = internalKernel.GetRequiredService<IChatCompletionService>("OllamaLight");
+                    _heavyChatService = internalKernel.GetRequiredService<IChatCompletionService>("OllamaHeavy");
+                    _lightChatService = internalKernel.GetRequiredService<IChatCompletionService>("OllamaLight");
+                }
             }
             catch (Exception ex)
             {
