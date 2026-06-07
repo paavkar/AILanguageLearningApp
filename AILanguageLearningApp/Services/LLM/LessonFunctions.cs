@@ -11,10 +11,10 @@ namespace AILanguageLearningApp.Services.LLM
 
         [KernelFunction]
         [Description("Creates a new language lesson.")]
-        public Lesson CreateLesson(
+        public async Task<Lesson> CreateLesson(
             [Description("The target language to learn (e.g., Japanese, French).")] string language,
             [Description("The topic of the lesson.")] string topic,
-            [Description("The language level (e.g., A1, A2, B1).")] string level,
+            [Description("The language level (A1, A2, B1, B2, C1, C2).")] string level,
             [Description("The exercises payload raw JSON string. MUST match the requested schema layout exactly.")] string exercisesJson)
         {
             if (!Enum.TryParse(level, true, out LanguageLevel languageLevel))

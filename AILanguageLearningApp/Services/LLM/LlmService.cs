@@ -2,42 +2,101 @@
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.Ollama;
+using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace AILanguageLearningApp.Services.LLM
 {
     public class LlmService : ILlmService
     {
-        readonly IKernelBuilder builder = Kernel.CreateBuilder();
-        readonly HttpClient ollamaClient = new()
+        private readonly HttpClient _ollamaClient = new()
         {
             BaseAddress = new Uri("http://localhost:11434"),
-            Timeout = TimeSpan.FromMinutes(10) // Allow up to 10 minutes for massive nested JSON generations
+            Timeout = TimeSpan.FromMinutes(10)
         };
-        readonly Kernel Kernel;
-        readonly IChatCompletionService Chat;
-        readonly ChatHistory History = [];
-        readonly OllamaPromptExecutionSettings Settings = new()
+
+        private Kernel _kernel;
+
+        private IChatCompletionService _heavyChatService;
+        private IChatCompletionService _lightChatService;
+
+        private string _heavyModelId = "gemma4:12b";
+        private string _lightModelId = "gemma4:4b";
+
+        private readonly ChatHistory _history = [];
+        private readonly ChatHistory _lightHistory = [];
+        private readonly ILogger<LlmService> _logger;
+
+        private readonly OllamaPromptExecutionSettings _heavySettings = new()
         {
             FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
         };
+        private readonly OllamaPromptExecutionSettings _lightSettings = new();
 
-        string userLanguage = SecureStorage.GetAsync("userLanguage").GetAwaiter().GetResult() ?? "English";
-        ILogger<LlmService> Logger;
+        private string _userLanguage = "English";
 
-        public LlmService(ILogger<LlmService> logger)
+        public string HeavyModelId
         {
-            builder.AddOllamaChatCompletion(
-                modelId: "gemma4:12b",
-                httpClient: ollamaClient
-            );
-            Kernel = builder.Build();
+            get => _heavyModelId;
+            set { if (_heavyModelId != value) { _heavyModelId = value; InitializeServices(); } }
+        }
 
-            Chat = Kernel.GetRequiredService<IChatCompletionService>();
+        public string LightModelId
+        {
+            get => _lightModelId;
+            set { if (_lightModelId != value) { _lightModelId = value; InitializeServices(); } }
+        }
 
-            var systemMessage = $$"""
+        public LlmService(Kernel kernel, ILogger<LlmService> logger)
+        {
+            _kernel = kernel;
+            _logger = logger;
+
+            InitializeServices();
+            _ = InitializeAsync();
+            SetupSystemPrompt();
+        }
+
+        private void InitializeServices()
+        {
+            try
+            {
+                IKernelBuilder builder = Kernel.CreateBuilder();
+
+#pragma warning disable SKEXP0070
+                // Register the Heavy Model with a distinct Service ID
+                builder.AddOllamaChatCompletion(
+                    serviceId: "OllamaHeavy",
+                    modelId: _heavyModelId,
+                    httpClient: _ollamaClient
+                );
+
+                // Register the Light Model with a distinct Service ID
+                builder.AddOllamaChatCompletion(
+                    serviceId: "OllamaLight",
+                    modelId: _lightModelId,
+                    httpClient: _ollamaClient
+                );
+#pragma warning restore SKEXP0070
+
+                Kernel internalKernel = builder.Build();
+
+                // Extract the separate services using their Service IDs
+                _heavyChatService = internalKernel.GetRequiredService<IChatCompletionService>("OllamaHeavy");
+                _lightChatService = internalKernel.GetRequiredService<IChatCompletionService>("OllamaLight");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error initializing dual-model configurations.");
+            }
+        }
+
+        private void SetupSystemPrompt()
+        {
+            var heavySystemMessage = $$"""
                 [ROLE]
-                You are an automated language content generator. Your sole function is to call tool functions using valid parameters. Do not converse with the user.
+                You are an automated language content generator. Your sole function is to call tool functions using valid parameters.
 
                 [WORKFLOW]
                 1. Determine the correct function to execute:
@@ -46,7 +105,7 @@ namespace AILanguageLearningApp.Services.LLM
                 2. Build the 'exercisesJson' parameter as a strict JSON string representing an array of exercises, matching the exact counts requested.
 
                 [CRITICAL CONSTRAINTS]
-                - User's native language is: {{userLanguage}}. The 'instructions' and 'nativeLanguageContent' values inside tasks MUST use this language.
+                - User's native language is: {{_userLanguage}}. The 'instructions' and 'nativeLanguageContent' values inside tasks MUST use this language.
                 - 'taskType' must be one of: Vocabulary, Grammar, Reading, Writing, Translation, Listening, Speaking.
                 - The user input contains the amount of exercises and tasks in each exercise that you need to generate. Follow those counts exactly in the JSON you produce.
 
@@ -132,8 +191,31 @@ namespace AILanguageLearningApp.Services.LLM
 
                 Invoke the required function tool now with all arguments satisfied.
             """;
-            History.AddSystemMessage(systemMessage);
-            Logger = logger;
+            _history.AddSystemMessage(heavySystemMessage);
+
+            var lightSystemMessage = $$"""
+                [ROLE]
+                You are an automated language content generator.
+
+                You will be provided with a user's answer to a task, the instructions for that task and the language that the answer should be in.
+                Your function is to evaluate whether the user's answer is correct or not, and provide a brief explanation in the user's native language.
+                
+                [CRITICAL CONSTRAINTS]
+                - User's native language is: {{_userLanguage}}. Use this language to respond to the user.
+            """;
+            _lightHistory.AddSystemMessage(lightSystemMessage);
+        }
+
+        private async Task InitializeAsync()
+        {
+            try
+            {
+                _userLanguage = await SecureStorage.GetAsync("userLanguage") ?? "English";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load user language from secure storage.");
+            }
         }
 
         public async Task CreateNewLessonAsync(string language, string exerciseTopic, string proficiencyLevel, int exerciseCount, int taskCount)
@@ -146,8 +228,8 @@ namespace AILanguageLearningApp.Services.LLM
                 Exercise Count: {{exerciseCount}}
                 Task Count: {{taskCount}}
             """;
-            History.AddUserMessage(input);
-            await GenerateResponseAsync();
+            _history.AddUserMessage(input);
+            await GenerateResponseAsync(_heavyChatService, _heavySettings, _kernel);
         }
 
         public async Task CreateNewExercisesAsync(Guid lessonId, string language, string exerciseTopic, string proficiencyLevel, int exerciseCount, int taskCount)
@@ -161,31 +243,64 @@ namespace AILanguageLearningApp.Services.LLM
                 Exercise Count: {{exerciseCount}}
                 Task Count: {{taskCount}}
              """;
-            History.AddUserMessage(input);
-            await GenerateResponseAsync();
+            _history.AddUserMessage(input);
+            await GenerateResponseAsync(_heavyChatService, _heavySettings, _kernel);
         }
 
-        public async Task GenerateResponseAsync()
+        public async Task CheckUserResponseAsync(string userResponse, string instructions, string language)
+        {
+            var input = $$"""
+                Check the user's answer to a task:
+                User Response: {{userResponse}}
+                Instructions: {{instructions}}
+                Language: {{language}}
+                Provide feedback on whether the user's response is correct or not, and offer a brief explanation.
+            """;
+            _lightHistory.AddUserMessage(input);
+            await GenerateResponseAsync(_lightChatService, _lightSettings);
+        }
+
+        public async Task GenerateResponseAsync(IChatCompletionService chat, OllamaPromptExecutionSettings settings, Kernel kernel = null)
         {
             StringBuilder assistantMessage = new();
             try
             {
-                await foreach (StreamingChatMessageContent token in Chat.GetStreamingChatMessageContentsAsync(
-                    History,
-                    executionSettings: Settings,
-                    kernel: Kernel))
+                await foreach (StreamingChatMessageContent token in chat.GetStreamingChatMessageContentsAsync(
+                    kernel is null ? _lightHistory : _history,
+                    executionSettings: settings,
+                    kernel: kernel))
                 {
                     if (!string.IsNullOrEmpty(token.Content))
                     {
                         assistantMessage.Append(token.Content);
                     }
                 }
-                History.AddAssistantMessage(assistantMessage.ToString());
+                await AppShell.DisplaySnackbarAsync(assistantMessage.ToString()); // Change this to something more appropriate
+
+                if (kernel is null)
+                {
+                    _lightHistory.AddAssistantMessage(assistantMessage.ToString());
+                }
+                else
+                {
+                    _history.AddAssistantMessage(assistantMessage.ToString());
+                }
+
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "An error occurred while generating the response from the LLM.");
+                _logger.LogError(ex, "An error occurred while generating the response from the LLM.");
             }
         }
+
+        public async Task<List<string>> GetAvailableModelsAsync()
+        {
+            OllamaTagsResponse? response = await _ollamaClient.GetFromJsonAsync<OllamaTagsResponse>("/api/tags");
+            List<string> models = response?.Models?.Select(m => m.Name).ToList() ?? [];
+            return models;
+        }
     }
+
+    public record OllamaTagsResponse([property: JsonPropertyName("models")] List<OllamaModelInfo> Models);
+    public record OllamaModelInfo([property: JsonPropertyName("name")] string Name);
 }
