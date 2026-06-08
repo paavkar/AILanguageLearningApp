@@ -27,17 +27,18 @@ namespace AILanguageLearningApp
 #if DEBUG
             builder.Logging.AddDebug();
 #endif
+            builder.Services.AddSingleton<DatabaseInitializer>();
             builder.Services.AddSingleton<UserAccountRepository>();
+            builder.Services.AddSingleton<TaskRepository>();
+            builder.Services.AddSingleton<ExerciseRepository>();
+            builder.Services.AddSingleton<LessonRepository>();
+            builder.Services.AddSingleton<CourseRepository>();
             builder.Services.AddSingleton<ILlmService, LlmService>();
+            builder.Services.AddTransient<LessonFunctions>();
 
-            builder.Services.AddTransient<Kernel>(sp =>
-            {
-                IKernelBuilder builder = Kernel.CreateBuilder();
+            IKernelBuilder kernelBuilder = builder.Services.AddKernel();
 
-                builder.Plugins.AddFromObject(new LessonFunctions(), "LanguagePlugin");
-
-                return builder.Build();
-            });
+            kernelBuilder.Plugins.AddFromType<LessonFunctions>("LanguagePlugin");
 
             builder.Services.AddTransient<MainPageModel>();
 

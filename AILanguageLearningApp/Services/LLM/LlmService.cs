@@ -30,7 +30,8 @@ namespace AILanguageLearningApp.Services.LLM
 
         private readonly OllamaPromptExecutionSettings _heavySettings = new()
         {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
+
         };
         private readonly OllamaPromptExecutionSettings _lightSettings = new();
 
@@ -125,102 +126,26 @@ namespace AILanguageLearningApp.Services.LLM
         private void SetupSystemPrompt()
         {
             var heavySystemMessage = $$"""
-                [ROLE]
-                You are an automated language content generator. Your sole function is to call tool functions using valid parameters.
+                 [ROLE]
+                 You are an automated language content generator. Your sole function is to call tool functions using valid parameters based on user criteria.
+                 You have two functions available 'CreateLesson' and 'AddLessonExercises' from the 'LanguagePlugin' plugin.
 
-                [WORKFLOW]
-                1. Determine the correct function to execute:
-                   - To start a new lesson, call 'CreateLesson'.
-                   - To add content to an existing lesson, call 'AddLessonExercises'.
-                2. Build the 'exercisesJson' parameter as a strict JSON string representing an array of exercises, matching the exact counts requested.
+                 [WORKFLOW]
+                 1. Determine the correct function to execute:
+                    - To start a brand new lesson, call 'CreateLesson'.
+                    - To add content to an existing lesson, call 'AddLessonExercises'.
+                 2. Populate the parameters and 'exercises' array arguments using structures matching the exact counts requested.
 
-                [CRITICAL CONSTRAINTS]
-                - User's native language is: {{_userLanguage}}. The 'instructions' and 'nativeLanguageContent' values inside tasks MUST use this language.
-                - 'taskType' must be one of: Vocabulary, Grammar, Reading, Writing, Translation, Listening, Speaking.
-                - The user input contains the amount of exercises and tasks in each exercise that you need to generate. Follow those counts exactly in the JSON you produce.
+                 [CRITICAL CONSTRAINTS]
+                 - The user's native language is: {{_userLanguage}}. The 'instructions' and 'nativeLanguageContent' properties inside the tasks MUST be written entirely in this language.
+                 - The user input will contain an "Exercise Count" and a "Task Count". You must generate exactly that quantity of exercises and tasks. Each exercise must have exactly the same amount of tasks as "Task Count".
+                 - For every task generated, you MUST populate all non-null properties: 'taskType', 'targetLanguageContent', 'instructions', and 'correctAnswer'.
+                 - For every task, 'taskType' MUST be exactly one of these literal values: Vocabulary, Grammar, Reading, Writing, Translation, Listening, Speaking. 
+                 - DO NOT use any other variations, synonyms, or custom text for 'taskType'. Invalid values will break the system.
+                 - Prefer multiple-choice questions for task types 'Reading', 'Listening', 'Grammar', 'Vocabulary'. Provide options in 'choices' with the key for the correct answer being in 'correctAnswer'.
 
-                [exercisesJson MINIMAL STRING SCHEMA EXAMPLE]
-                [
-                  {
-                    "tasks": [
-                      {
-                            "taskType": "Translation",
-                            "targetLanguageContent": "Bonjour, comment ça va ?",
-                            "nativeLanguageContent": "Hello, how is it going?",
-                            "instructions": "Translate the sentence into your native language.",
-                            "choices": null,
-                            "correctAnswer": "Hello, how is it going?"
-                          },
-                          {
-                            "taskType": "Writing",
-                            "targetLanguageContent": "",
-                            "nativeLanguageContent": null,
-                            "instructions": "Write a short paragraph (3-4 sentences) in the target language describing your favorite hobby.",
-                            "choices": null,
-                            "correctAnswer": null
-                          },
-                          {
-                            "taskType": "Speaking",
-                            "targetLanguageContent": "La vie est belle.",
-                            "nativeLanguageContent": "Life is beautiful.",
-                            "instructions": "Read the target language text aloud, focusing on clear pronunciation.",
-                            "choices": null,
-                            "correctAnswer": "La vie est belle."
-                          },
-                          {
-                            "taskType": "Listening",
-                            "targetLanguageContent": "Bonjour tout le monde. En raison de travaux sur les voies entre Paris et Lyon, le train numéro 452 départ initialement prévu à neuf heures aura du retard. Le train partira finalement à dix heures de la gare centrale, quai numéro trois. Nous nous excusons pour ce désagrément.",
-                            "nativeLanguageContent": null,
-                            "instructions": "Listen closely to the announcement and answer: What time will the train actually depart?",
-                            "choices": {
-                              "A": "At 9:00",
-                              "B": "At 10:00",
-                              "C": "At 3:00"
-                            },
-                            "correctAnswer": "B"
-                          },
-                          {
-                            "taskType": "Vocabulary",
-                            "targetLanguageContent": "pomme",
-                            "nativeLanguageContent": "apple",
-                            "instructions": "What is the meaning of the target language word 'pomme'?",
-                            "choices": {
-                              "A": "Banana",
-                              "B": "Apple",
-                              "C": "Orange"
-                            },
-                            "correctAnswer": "B"
-                          },
-                          {
-                            "taskType": "Grammar",
-                            "targetLanguageContent": "Ils ____ (être) fatigués ce soir.",
-                            "nativeLanguageContent": null,
-                            "instructions": "Complete the sentence by conjugating the verb 'être' correctly for the pronoun 'Ils'.",
-                            "choices": {
-                              "A": "suis",
-                              "B": "êtes",
-                              "C": "sont"
-                            },
-                            "correctAnswer": "C"
-                          },
-                          {
-                            "taskType": "Reading",
-                            "targetLanguageContent": "Chaque samedi matin, Lucas se rend au marché local pour acheter des fruits frais et du pain artisanal. Aujourd'hui, le marché est exceptionnellement bondé car il fait un soleil magnifique. Après avoir fait ses courses, il s'arrête toujours au petit café de la place pour lire le journal en buvant un expresso.",
-                            "nativeLanguageContent": null,
-                            "instructions": "Read the text carefully and answer the following question: What does Lucas always do immediately after finishing his grocery shopping at the market?",
-                            "choices": {
-                              "A": "He goes home to make breakfast with his fresh fruit.",
-                              "B": "He buys an artisanal bread from the local bakery.",
-                              "C": "He visits a small cafe on the square to drink an espresso and read."
-                            },
-                            "correctAnswer": "C"
-                          }
-                    ]
-                  }
-                ]
-
-                Invoke the required function tool now with all arguments satisfied.
-            """;
+                 Execute the required tool function now. Do not return conversational text responses.
+                 """;
             _history.AddSystemMessage(heavySystemMessage);
 
             var lightSystemMessage = $$"""
@@ -248,7 +173,7 @@ namespace AILanguageLearningApp.Services.LLM
             }
         }
 
-        public async Task CreateNewLessonAsync(string language, string exerciseTopic, string proficiencyLevel, int exerciseCount, int taskCount)
+        public async Task<bool> CreateNewLessonAsync(string language, string exerciseTopic, string proficiencyLevel, int exerciseCount, int taskCount)
         {
             var input = $$"""
                 Use 'CreateLesson' to generate new lesson with exercises:
@@ -260,6 +185,7 @@ namespace AILanguageLearningApp.Services.LLM
             """;
             _history.AddUserMessage(input);
             await GenerateResponseAsync(_heavyChatService, _heavySettings, _kernel);
+            return true;
         }
 
         public async Task CreateNewExercisesAsync(Guid lessonId, string language, string exerciseTopic, string proficiencyLevel, int exerciseCount, int taskCount)
@@ -290,13 +216,17 @@ namespace AILanguageLearningApp.Services.LLM
             await GenerateResponseAsync(_lightChatService, _lightSettings);
         }
 
-        public async Task GenerateResponseAsync(IChatCompletionService chat, OllamaPromptExecutionSettings settings, Kernel kernel = null)
+        public async Task GenerateResponseAsync(
+            IChatCompletionService chat,
+            OllamaPromptExecutionSettings settings,
+            Kernel kernel = null)
         {
             StringBuilder assistantMessage = new();
+            ChatHistory targetHistory = kernel is null ? _lightHistory : _history;
             try
             {
                 await foreach (StreamingChatMessageContent token in chat.GetStreamingChatMessageContentsAsync(
-                    kernel is null ? _lightHistory : _history,
+                    chatHistory: targetHistory,
                     executionSettings: settings,
                     kernel: kernel))
                 {

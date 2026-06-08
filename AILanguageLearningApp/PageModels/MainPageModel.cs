@@ -1,5 +1,6 @@
 ﻿using AILanguageLearningApp.Services.LLM;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -81,6 +82,23 @@ namespace AILanguageLearningApp.PageModels
             {
                 IsLoading = false;
             }
+        }
+
+        [RelayCommand]
+        public async Task CreateLesson()
+        {
+            IsLoading = true;
+            var input = new
+            {
+                Language = "Japanese",
+                Topic = "Ordering at a restaurant",
+                Level = "A1",
+            };
+            _ = Task.Run(async () =>
+            {
+                await _llmService.CreateNewLessonAsync(input.Language, input.Topic, input.Level, 3, 5);
+                IsLoading = false;
+            });
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

@@ -19,7 +19,7 @@ namespace AILanguageLearningApp.Data
             if (_hasBeenInitialized)
                 return;
 
-            await using SqliteConnection connection = new SqliteConnection(Constants.DatabasePath);
+            await using SqliteConnection connection = new(Constants.DatabasePath);
             await connection.OpenAsync();
 
             try
@@ -42,7 +42,7 @@ namespace AILanguageLearningApp.Data
             _hasBeenInitialized = true;
         }
 
-        private async Task<UserAccount?> GetByUsernameAsync(string username)
+        public async Task<UserAccount?> GetByUsernameAsync(string username)
         {
             await Init();
             await using SqliteConnection connection = new(Constants.DatabasePath);
@@ -64,6 +64,30 @@ namespace AILanguageLearningApp.Data
                 };
             }
             return account;
+        }
+
+        public async Task CreateUserAsync(UserAccount account)
+        {
+            await Init();
+
+            await using SqliteConnection connection = new(Constants.DatabasePath);
+            await connection.OpenAsync();
+
+            SqliteCommand insertCmd = connection.CreateCommand();
+            insertCmd.CommandText = "INSERT INTO UserAccounts (Id, Username, PasswordHash) VALUES (@Id, @Username, @PasswordHash)";
+            insertCmd.Parameters.AddWithValue("Id", account.Id.ToString());
+            insertCmd.Parameters.AddWithValue("Username", account.Username);
+            insertCmd.Parameters.AddWithValue("PasswordHash", account.PasswordHash);
+
+            try
+            {
+                await insertCmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while creating a new user account.");
+                throw;
+            }
         }
     }
 }

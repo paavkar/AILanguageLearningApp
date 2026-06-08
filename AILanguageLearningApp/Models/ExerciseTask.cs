@@ -8,28 +8,28 @@ namespace AILanguageLearningApp.Models
         public Guid Id { get; set; } = Guid.CreateVersion7();
         public Guid ExerciseId { get; set; }
 
+        [Description("The content in the target language (i.e. language from user input) for the task. For Listening/Speaking, this is the text to be spoken/heard.")]
         [JsonPropertyName("targetLanguageContent")]
-        [Description("The content in the target language for the task. For Listening/Speaking, this is the text to be spoken/heard.")]
         public string TargetLanguageContent { get; set; }
 
+        [Description("Translation or helper text in the user's native language.")]
         [JsonPropertyName("nativeLanguageContent")]
-        [Description("The content in the native language for the task.")]
         public string? NativeLanguageContent { get; set; }
 
+        [Description("Instructions for the user, written in their native language. MUST be provided.")]
         [JsonPropertyName("instructions")]
-        [Description("The instructions for the task.")]
         public string Instructions { get; set; }
 
+        [Description("The type of task. Allowed values: Vocabulary, Grammar, Reading, Writing, Translation, Listening, Speaking. MUST be provided.")]
         [JsonPropertyName("taskType")]
-        [Description("The type of the task. MUST be exactly one of these strings: Vocabulary, Grammar, Reading, Writing, Translation, Listening, Speaking")]
         public string TaskType { get; set; }
 
+        [Description("The correct answer key (e.g., 'A', 'B', or 'C').")]
         [JsonPropertyName("correctAnswer")]
-        [Description("Optional. The exact expected answer text or correct choice key (e.g., 'A', 'true', or a word).")]
         public string? CorrectAnswer { get; set; }
 
+        [Description("A key-value dictionary of multiple-choice options (e.g., A: Option 1, B: Option 2, C: Option 3). Null if not a multiple-choice question.")]
         [JsonPropertyName("choices")]
-        [Description("Optional. Multiple choice options provided as a dictionary (e.g., {\"A\": \"Option 1\", \"B\": \"Option 2\"}). Set to null if not a multiple-choice task.")]
         public Dictionary<string, string>? Choices { get; set; }
 
         public override string ToString()

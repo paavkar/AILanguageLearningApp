@@ -9,8 +9,8 @@ namespace AILanguageLearningApp.Models
         public Guid LessonId { get; set; }
         public bool Finished { get; set; } = false;
 
+        [Description("The collection of distinct learning tasks for this exercise.")]
         [JsonPropertyName("tasks")]
-        [Description("The list of specific language tasks belonging strictly to this exercise.")]
         public List<ExerciseTask> Tasks { get; set; } = [];
     }
 }

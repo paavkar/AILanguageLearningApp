@@ -6,19 +6,20 @@ namespace AILanguageLearningApp.Models
     public class Lesson
     {
         public Guid Id { get; set; }
+        public Guid CourseId { get; set; }
 
-        [JsonPropertyName("language")]
         [Description("The language being learned (e.g., Spanish, Japanese)")]
+        [JsonPropertyName("language")]
         public string Language { get; set; }
 
-        [JsonPropertyName("topic")]
         [Description("The topic of the lesson")]
+        [JsonPropertyName("topic")]
         public string Topic { get; set; }
 
         [Description("The CEFR language proficiency level. MUST be exactly one of these strings: A1, A2, B1, B2, C1, C2")]
         public LanguageLevel Level { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
-        public List<LessonExercise> Contents { get; set; } = [];
+        public List<LessonExercise> Exercises { get; set; } = [];
     }
 
     public enum LanguageLevel

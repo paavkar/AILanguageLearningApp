@@ -61,6 +61,10 @@
                     Command="{Binding LoadModelsCommand}"
                     IsEnabled="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}" 
                     HorizontalOptions="FillAndExpand" />
+
+            <Button Text="Add test lesson"
+                    Command="{Binding CreateLessonCommand}"
+                    IsEnabled="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}" />
         </VerticalStackLayout>
     </ScrollView>
 

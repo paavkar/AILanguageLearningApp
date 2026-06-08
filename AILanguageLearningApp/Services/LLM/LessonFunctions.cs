@@ -1,25 +1,42 @@
 ﻿using AILanguageLearningApp.Models;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using System.ComponentModel;
-using System.Text.Json;
 
 namespace AILanguageLearningApp.Services.LLM
 {
-    public class LessonFunctions
+    public class LessonFunctions(
+        CourseRepository courseRepository,
+        LessonRepository lessonRepository,
+        ExerciseRepository exerciseRepository,
+        TaskRepository taskRepository,
+        ILogger<LessonFunctions> logger)
     {
-        private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
-
-        [KernelFunction]
+        [KernelFunction("CreateLesson")]
         [Description("Creates a new language lesson.")]
         public async Task<Lesson> CreateLesson(
             [Description("The target language to learn (e.g., Japanese, French).")] string language,
             [Description("The topic of the lesson.")] string topic,
             [Description("The language level (A1, A2, B1, B2, C1, C2).")] string level,
-            [Description("The exercises payload raw JSON string. MUST match the requested schema layout exactly.")] string exercisesJson)
+            [Description("The list of exercises. Each exercise must contain a 'tasks' array where each task strictly includes: 'taskType', 'targetLanguageContent', 'nativeLanguageContent', 'instructions', 'choices' (if multiple choice), and 'correctAnswer'.")] List<LessonExercise> exercises)
         {
             if (!Enum.TryParse(level, true, out LanguageLevel languageLevel))
             {
                 throw new ArgumentException($"Level '{level}' is not a valid enumerated value.");
+            }
+            LanguageCourse? course = await courseRepository.GetByLanguageAsync(language);
+            if (course is null)
+            {
+                LanguageCourse newCourse = new()
+                {
+                    Id = Guid.CreateVersion7(),
+                    UserId = Guid.CreateVersion7(), // Placeholder, should be set to the actual user ID
+                    Name = $"{language}",
+                    Lessons = []
+                };
+                course = newCourse;
+                await courseRepository.SaveItemAsync(newCourse);
             }
             Lesson lesson = new()
             {
@@ -27,16 +44,13 @@ namespace AILanguageLearningApp.Services.LLM
                 Topic = topic,
                 Level = languageLevel,
                 CreatedAt = DateTimeOffset.UtcNow,
-                Id = Guid.CreateVersion7()
+                Id = Guid.CreateVersion7(),
+                CourseId = course.Id,
             };
+            await lessonRepository.SaveItemAsync(lesson);
             try
             {
-                // Manually deserialize the flattened string
-                List<LessonExercise>? exercises = JsonSerializer.Deserialize<List<LessonExercise>>(exercisesJson, _jsonOptions);
-                if (exercises != null)
-                {
-                    ProcessExercises(lesson.Id, exercises);
-                }
+                await ProcessExercises(lesson.Id, exercises);
             }
             catch (Exception ex)
             {
@@ -46,11 +60,11 @@ namespace AILanguageLearningApp.Services.LLM
             return lesson;
         }
 
-        [KernelFunction]
+        [KernelFunction("AddLessonExercises")]
         [Description("Adds structured exercises to an existing lesson using its unique ID.")]
-        public List<LessonExercise> AddLessonExercises(
+        public async Task<List<LessonExercise>> AddLessonExercises(
             [Description("The unique GUID string of the existing lesson.")] string lessonId,
-            [Description("The exercises payload raw JSON string. MUST match the requested schema layout exactly.")] string exercisesJson)
+            [Description("The array of exercises to generate for this lesson.")] List<LessonExercise> exercises)
         {
             if (!Guid.TryParse(lessonId, out Guid lessonGuid))
             {
@@ -59,11 +73,7 @@ namespace AILanguageLearningApp.Services.LLM
 
             try
             {
-                List<LessonExercise>? exercises = JsonSerializer.Deserialize<List<LessonExercise>>(exercisesJson, _jsonOptions);
-                if (exercises != null)
-                {
-                    return ProcessExercises(lessonGuid, exercises);
-                }
+                return await ProcessExercises(lessonGuid, exercises);
             }
             catch (Exception ex)
             {
@@ -73,19 +83,38 @@ namespace AILanguageLearningApp.Services.LLM
             return [];
         }
 
-        private List<LessonExercise> ProcessExercises(Guid lessonId, List<LessonExercise> exercises)
+        private async Task<List<LessonExercise>> ProcessExercises(Guid lessonId, List<LessonExercise> exercises)
         {
-            foreach (LessonExercise exercise in exercises)
+            await using SqliteConnection connection = new(Constants.DatabasePath);
+            await connection.OpenAsync();
+
+            await using SqliteTransaction transaction = connection.BeginTransaction();
+
+            try
             {
-                exercise.Id = Guid.CreateVersion7();
-                exercise.LessonId = lessonId;
-
-                if (exercise.Tasks == null) continue;
-
-                foreach (ExerciseTask task in exercise.Tasks)
+                foreach (LessonExercise exercise in exercises)
                 {
-                    task.ExerciseId = exercise.Id;
+                    exercise.Id = Guid.CreateVersion7();
+                    exercise.LessonId = lessonId;
+
+                    await exerciseRepository.SaveItemWithConnectionAsync(exercise, connection, transaction);
+
+                    foreach (ExerciseTask task in exercise.Tasks)
+                    {
+                        task.ExerciseId = exercise.Id;
+
+                        await taskRepository.SaveItemWithConnectionAsync(task, connection, transaction);
+                    }
                 }
+
+                await transaction.CommitAsync();
+                logger.LogInformation("All exercises and tasks saved successfully in a single transaction.");
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                logger.LogError(ex, "Transaction failed! All changes rolled back.");
+                throw;
             }
 
             return exercises;
