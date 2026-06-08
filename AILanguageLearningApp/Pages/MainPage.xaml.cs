@@ -1,4 +1,4 @@
-﻿namespace AILanguageLearningApp
+﻿namespace AILanguageLearningApp.Pages
 {
     public partial class MainPage : ContentPage
     {

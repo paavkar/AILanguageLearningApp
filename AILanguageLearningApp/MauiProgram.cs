@@ -40,7 +40,8 @@ namespace AILanguageLearningApp
 
             kernelBuilder.Plugins.AddFromType<LessonFunctions>("LanguagePlugin");
 
-            builder.Services.AddTransient<MainPageModel>();
+            builder.Services.AddSingleton<MainPageModel>();
+            builder.Services.AddSingleton<SettingsPageModel>();
 
             MauiApp app = builder.Build();
 

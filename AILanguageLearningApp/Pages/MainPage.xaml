@@ -5,7 +5,7 @@
              xmlns:models="clr-namespace:AILanguageLearningApp.Models"
              xmlns:local="clr-namespace:AILanguageLearningApp"
              x:DataType="pageModels:MainPageModel"
-             x:Class="AILanguageLearningApp.MainPage">
+             x:Class="AILanguageLearningApp.Pages.MainPage">
 
     <ContentPage.Resources>
         <ResourceDictionary>
@@ -28,39 +28,9 @@
                 SemanticProperties.HeadingLevel="Level2"
                 SemanticProperties.Description="Welcome to dot net Multi platform App U I" />
 
-            <Label Text="Ollama Model Selector" 
-                   FontSize="24" 
-                   FontAttributes="Bold" 
-                   HorizontalOptions="Center" />
-
             <ActivityIndicator IsRunning="{Binding IsLoading}" 
                                IsVisible="{Binding IsLoading}" 
                                HorizontalOptions="Center" />
-
-            <Border Padding="15" StrokeShape="RoundRectangle 10" StrokeThickness="1">
-                <VerticalStackLayout Spacing="15">
-
-                    <Label Text="Heavy Model (Functions &amp; JSON generation):" 
-                           FontAttributes="Bold" />
-                    <Picker Title="Select Heavy Model"
-                            ItemsSource="{Binding AvailableModels}"
-                            SelectedItem="{Binding SelectedHeavyModel}" />
-
-                    <BoxView HeightRequest="1" Color="Gray" Margin="0,5" />
-
-                    <Label Text="Light Model (Quick lookups &amp; translations):" 
-                           FontAttributes="Bold" />
-                    <Picker Title="Select Light Model"
-                            ItemsSource="{Binding AvailableModels}"
-                            SelectedItem="{Binding SelectedLightModel}" />
-
-                </VerticalStackLayout>
-            </Border>
-
-            <Button Text="Refresh Local Ollama Models" 
-                    Command="{Binding LoadModelsCommand}"
-                    IsEnabled="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}" 
-                    HorizontalOptions="FillAndExpand" />
 
             <Button Text="Add test lesson"
                     Command="{Binding CreateLessonCommand}"

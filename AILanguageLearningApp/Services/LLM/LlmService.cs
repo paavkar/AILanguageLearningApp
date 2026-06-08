@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using AILanguageLearningApp.Models;
+using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.Ollama;
@@ -31,7 +33,6 @@ namespace AILanguageLearningApp.Services.LLM
         private readonly OllamaPromptExecutionSettings _heavySettings = new()
         {
             FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
-
         };
         private readonly OllamaPromptExecutionSettings _lightSettings = new();
 
@@ -130,20 +131,16 @@ namespace AILanguageLearningApp.Services.LLM
                  You are an automated language content generator. Your sole function is to call tool functions using valid parameters based on user criteria.
                  You have two functions available 'CreateLesson' and 'AddLessonExercises' from the 'LanguagePlugin' plugin.
 
-                 [WORKFLOW]
-                 1. Determine the correct function to execute:
-                    - To start a brand new lesson, call 'CreateLesson'.
-                    - To add content to an existing lesson, call 'AddLessonExercises'.
-                 2. Populate the parameters and 'exercises' array arguments using structures matching the exact counts requested.
-
                  [CRITICAL CONSTRAINTS]
                  - The user's native language is: {{_userLanguage}}. The 'instructions' and 'nativeLanguageContent' properties inside the tasks MUST be written entirely in this language.
-                 - The user input will contain an "Exercise Count" and a "Task Count". You must generate exactly that quantity of exercises and tasks. Each exercise must have exactly the same amount of tasks as "Task Count".
-                 - For every task generated, you MUST populate all non-null properties: 'taskType', 'targetLanguageContent', 'instructions', and 'correctAnswer'.
-                 - For every task, 'taskType' MUST be exactly one of these literal values: Vocabulary, Grammar, Reading, Writing, Translation, Listening, Speaking. 
-                 - DO NOT use any other variations, synonyms, or custom text for 'taskType'. Invalid values will break the system.
-                 - Prefer multiple-choice questions for task types 'Reading', 'Listening', 'Grammar', 'Vocabulary'. Provide options in 'choices' with the key for the correct answer being in 'correctAnswer'.
-
+                 
+                 [VALIDATION REGULATION]
+                 - You must strictly match the "Exercise Count" and "Task Count" requested by the user. Every exercise must contain exactly the "Task Count" number of tasks.
+                 - Fields 'taskType', 'targetLanguageContent', 'nativeLanguageContent', 'instructions' are REQUIRED. They must NEVER be null, empty, or whitespace.
+                 - 'taskType' MUST be exactly one of these literal values: [Vocabulary, Grammar, Reading, Writing, Translation, Listening, Speaking]. Do not use any other synonyms.
+                 - For 'Reading', 'Listening', 'Grammar', and 'Vocabulary' types, you MUST populate the 'choices' dictionary field.
+                 - Field 'correctAnswer' is REQUIRED when 'choices' field is populated.
+                 
                  Execute the required tool function now. Do not return conversational text responses.
                  """;
             _history.AddSystemMessage(heavySystemMessage);
@@ -233,6 +230,8 @@ namespace AILanguageLearningApp.Services.LLM
                     if (!string.IsNullOrEmpty(token.Content))
                     {
                         assistantMessage.Append(token.Content);
+                        WeakReferenceMessenger.Default.Send(new TextChunkReceivedMessage(token.Content));
+                        await Task.Delay(1);
                     }
                 }
                 await AppShell.DisplaySnackbarAsync(assistantMessage.ToString()); // Change this to something more appropriate

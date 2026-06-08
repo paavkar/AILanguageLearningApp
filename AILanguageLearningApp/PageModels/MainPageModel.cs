@@ -1,87 +1,35 @@
-﻿using AILanguageLearningApp.Services.LLM;
+﻿using AILanguageLearningApp.Models;
+using AILanguageLearningApp.Services.LLM;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.Messaging;
 using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using System.Windows.Input;
 
 namespace AILanguageLearningApp.PageModels
 {
-    public partial class MainPageModel : ObservableObject, INotifyPropertyChanged
+    public partial class MainPageModel : ObservableObject, INotifyPropertyChanged, IRecipient<TextChunkReceivedMessage>
     {
         private readonly ILlmService _llmService;
-        private string _selectedHeavyModel;
-        private string _selectedLightModel;
+        [ObservableProperty]
         private bool _isLoading;
-        public ObservableCollection<string> AvailableModels { get; } = [];
 
-        public string SelectedHeavyModel
-        {
-            get => _selectedHeavyModel;
-            set
-            {
-                if (SetProperty(ref _selectedHeavyModel, value))
-                {
-                    _llmService.HeavyModelId = value;
-                }
-            }
-        }
-
-        public string SelectedLightModel
-        {
-            get => _selectedLightModel;
-            set
-            {
-                if (SetProperty(ref _selectedLightModel, value))
-                {
-                    _llmService.LightModelId = value;
-                }
-            }
-        }
-
-        public bool IsLoading
-        {
-            get => _isLoading;
-            set => SetProperty(ref _isLoading, value);
-        }
-
-        public ICommand LoadModelsCommand { get; }
+        [ObservableProperty]
+        private string _statusMessage = "";
 
         public MainPageModel(ILlmService llmService)
         {
             _llmService = llmService;
-            LoadModelsCommand = new Command(async () => await LoadModelsAsync());
-            _ = LoadModelsAsync();
         }
 
-        private async Task LoadModelsAsync()
+        public void Receive(TextChunkReceivedMessage message)
         {
-            IsLoading = true;
-            try
+            System.Diagnostics.Debug.WriteLine($"Received: {message.Value}");
+            // MVVM Toolkit handles thread safety for basic property updates 
+            // bound to the UI, but if you do complex UI logic, use MainThread here.
+            MainThread.BeginInvokeOnMainThread(async () =>
             {
-                List<string> models = await _llmService.GetAvailableModelsAsync();
-
-                AvailableModels.Clear();
-                foreach (var model in models)
-                {
-                    AvailableModels.Add(model);
-                }
-
-                if (AvailableModels.Count > 0)
-                {
-                    SelectedHeavyModel = AvailableModels.Contains("gemma4:12b") ? "gemma4:12b" : AvailableModels.First();
-                    SelectedLightModel = AvailableModels.Contains("gemma4:e4b") ? "gemma4:e4b" : AvailableModels.First();
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading Ollama models: {ex.Message}");
-            }
-            finally
-            {
-                IsLoading = false;
-            }
+                StatusMessage += message.Value;
+            });
         }
 
         [RelayCommand]
@@ -96,18 +44,9 @@ namespace AILanguageLearningApp.PageModels
             };
             _ = Task.Run(async () =>
             {
-                await _llmService.CreateNewLessonAsync(input.Language, input.Topic, input.Level, 3, 5);
+                await _llmService.CheckUserResponseAsync("水をください", input.Topic, input.Language);
                 IsLoading = false;
             });
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
-        {
-            if (Equals(storage, value)) return false;
-            storage = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            return true;
         }
     }
 }

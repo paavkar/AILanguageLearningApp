@@ -8,11 +8,11 @@ namespace AILanguageLearningApp.Models
         public Guid Id { get; set; } = Guid.CreateVersion7();
         public Guid ExerciseId { get; set; }
 
-        [Description("The content in the target language (i.e. language from user input) for the task. For Listening/Speaking, this is the text to be spoken/heard.")]
+        [Description("The content in the target language (i.e. language from user input) for the task. For Listening/Speaking, this is the text to be spoken/heard. MUST be provided.")]
         [JsonPropertyName("targetLanguageContent")]
         public string TargetLanguageContent { get; set; }
 
-        [Description("Translation or helper text in the user's native language.")]
+        [Description("Translation or helper text in the user's native language. MUST be provided on relevant task types.")]
         [JsonPropertyName("nativeLanguageContent")]
         public string? NativeLanguageContent { get; set; }
 
