@@ -1,4 +1,5 @@
-﻿using AILanguageLearningApp.Services.LLM;
+﻿using AILanguageLearningApp.Models;
+using AILanguageLearningApp.Services.LLM;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
@@ -14,8 +15,28 @@ namespace AILanguageLearningApp.PageModels
 
         [ObservableProperty]
         private bool _isLoading;
+        [ObservableProperty]
+        private string _userLanguage = "";
 
         public ObservableCollection<string> AvailableModels { get; } = [];
+
+        public ObservableCollection<LanguageOption> AvailableLanguages { get; } = [];
+
+        private LanguageOption _selectedLanguageOption;
+        public LanguageOption SelectedLanguageOption
+        {
+            get => _selectedLanguageOption;
+            set
+            {
+                if (SetProperty(ref _selectedLanguageOption, value))
+                {
+                    if (value != null)
+                    {
+                        UserLanguage = value.EnglishName;
+                    }
+                }
+            }
+        }
 
         public string SelectedHeavyModel
         {
@@ -45,6 +66,27 @@ namespace AILanguageLearningApp.PageModels
         {
             _llmService = llmService;
             _ = LoadModelsAsync();
+            List<LanguageOption> languages =
+            [
+                new() { NativeName = "English", EnglishName = "English" },
+                new() { NativeName = "Deutsch", EnglishName = "German" },
+                new() { NativeName = "Español", EnglishName = "Spanish" },
+                new() { NativeName = "Français", EnglishName = "French" },
+                new() { NativeName = "中文", EnglishName = "Chinese" },
+                new() { NativeName = "Português", EnglishName = "Portuguese" },
+                new() { NativeName = "日本語", EnglishName = "Japanese" },
+            ];
+
+            foreach (LanguageOption l in languages)
+                AvailableLanguages.Add(l);
+
+            Task.Run(async () =>
+            {
+                var saved = await SecureStorage.GetAsync("userLanguage") ?? "English";
+                UserLanguage = saved;
+                SelectedLanguageOption = AvailableLanguages.FirstOrDefault(a => a.EnglishName == saved)
+                    ?? AvailableLanguages.FirstOrDefault()!;
+            });
         }
 
         [RelayCommand]
@@ -75,6 +117,14 @@ namespace AILanguageLearningApp.PageModels
             {
                 IsLoading = false;
             }
+        }
+
+        [RelayCommand]
+        public async Task SetUserLanguage()
+        {
+            var toSave = SelectedLanguageOption?.EnglishName ?? UserLanguage ?? "English";
+            await SecureStorage.SetAsync("userLanguage", toSave);
+            _llmService.UserLanguage = toSave;
         }
     }
 }

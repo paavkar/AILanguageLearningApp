@@ -9,5 +9,6 @@
 
         public string HeavyModelId { get; set; }
         public string LightModelId { get; set; }
+        public string UserLanguage { get; set; }
     }
 }

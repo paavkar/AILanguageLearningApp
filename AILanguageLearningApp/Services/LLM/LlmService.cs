@@ -50,14 +50,23 @@ namespace AILanguageLearningApp.Services.LLM
             set { if (_lightModelId != value) { _lightModelId = value; InitializeServices(); } }
         }
 
+        public string UserLanguage
+        {
+            get => _userLanguage;
+            set { if (_userLanguage != value) { _userLanguage = value; SetupSystemPrompt(); } }
+        }
+
         public LlmService(Kernel kernel, ILogger<LlmService> logger)
         {
             _kernel = kernel;
             _logger = logger;
 
             InitializeServices();
-            _ = InitializeAsync();
-            SetupSystemPrompt();
+            Task.Run(async () =>
+            {
+                await InitializeAsync();
+                SetupSystemPrompt();
+            });
         }
 
         private void InitializeServices()
@@ -126,6 +135,8 @@ namespace AILanguageLearningApp.Services.LLM
 
         private void SetupSystemPrompt()
         {
+            _history.Clear();
+            _lightHistory.Clear();
             var heavySystemMessage = $$"""
                  [ROLE]
                  You are an automated language content generator. Your sole function is to call tool functions using valid parameters based on user criteria.
